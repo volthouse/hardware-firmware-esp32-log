@@ -69,6 +69,21 @@ WiFiClient client;
 const int timerInterval = 30000 * 4;    // time between each HTTP POST image
 unsigned long previousMillis = 0;   // last time image was sent
 
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 3600;
+const int   daylightOffset_sec = 3600;
+
+void printLocalTime()
+{
+	struct tm timeinfo;
+	if(!getLocalTime(&timeinfo)){
+		Serial.println("Failed to obtain time");
+		return;
+	}
+
+	Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+}
+
 void setup() {
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
   Serial.begin(115200);
@@ -126,11 +141,29 @@ void setup() {
     delay(1000);
     ESP.restart();
   }
+  
+  //init and get the time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  printLocalTime();
 
   sendPhoto(); 
 }
 
-void loop() {
+void loop()
+{
+	static struct tm timeinfo;
+
+	if( getLocalTime(&timeinfo) ) {		
+		if( timeinfo.tm_hour >= 6 && timeinfo.tm_hour <= 18 ) {
+			snapshot();
+			//Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+		}
+	} else {
+		Serial.println("Faild to optain time");
+	}
+}
+
+void snapshot() {
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= timerInterval) {
     sendPhoto();
